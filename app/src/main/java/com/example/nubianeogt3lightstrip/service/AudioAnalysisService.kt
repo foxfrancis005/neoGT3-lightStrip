@@ -6,10 +6,12 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.example.nubianeogt3lightstrip.MainActivity
 import com.example.nubianeogt3lightstrip.R
 import com.example.nubianeogt3lightstrip.audio.AudioAnalyzer
@@ -88,8 +90,21 @@ class AudioAnalysisService : Service() {
     private fun startAnalysis() {
         if (isAnalyzing) return
         
+        // Verificar permisos antes de iniciar el servicio foreground
+        if (!checkAudioPermissions()) {
+            Log.e(TAG, "No se tienen los permisos necesarios para el análisis de audio")
+            stopSelf()
+            return
+        }
+        
         val notification = createNotification("Analizando audio...")
-        startForeground(NOTIFICATION_ID, notification)
+        try {
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Error de permisos al iniciar servicio foreground: ${e.message}")
+            stopSelf()
+            return
+        }
         
         if (audioAnalyzer.startAnalysis()) {
             isAnalyzing = true
@@ -99,6 +114,16 @@ class AudioAnalysisService : Service() {
             Log.e(TAG, "Error al iniciar análisis de audio")
             stopSelf()
         }
+    }
+    
+    /**
+     * Verifica si los permisos de audio están concedidos
+     */
+    private fun checkAudioPermissions(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this, 
+            android.Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
     }
     
     /**

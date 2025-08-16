@@ -2,6 +2,7 @@ package com.example.nubianeogt3lightstrip
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -70,18 +71,24 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     var showColorPicker by remember { mutableStateOf(false) }
     var hasAudioPermission by remember { 
         mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
+            // Lista de permisos requeridos
+            buildList {
+                add(Manifest.permission.RECORD_AUDIO)
+                // FOREGROUND_SERVICE_MICROPHONE solo se requiere en API 34+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    add(Manifest.permission.FOREGROUND_SERVICE_MICROPHONE)
+                }
+            }.all { permission ->
+                ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+            }
         )
     }
     
-    // Launcher para permisos
+    // Launcher para permisos múltiples
     val audioPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasAudioPermission = isGranted
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasAudioPermission = permissions.values.all { it }
     }
     
     Scaffold(
@@ -121,7 +128,14 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     if (hasAudioPermission) {
                         viewModel.toggleAudioAnalysis()
                     } else {
-                        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        // Solicitar permisos según la versión de Android
+                        val permissionsToRequest = buildList {
+                            add(Manifest.permission.RECORD_AUDIO)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                                add(Manifest.permission.FOREGROUND_SERVICE_MICROPHONE)
+                            }
+                        }.toTypedArray()
+                        audioPermissionLauncher.launch(permissionsToRequest)
                     }
                 }
             )
